@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import axios from '../utils/axios';
-import YouTube from 'react-youtube';
+import axios from '../utils/axios'; // Or use centralized API
 import movieTrailer from 'movie-trailer';
+import { motion, AnimatePresence } from 'framer-motion';
 
-function MovieDetail({ movieId, onClose }) {
+function MovieDetail({ movieId, onClose, onPlay }) {
   const [movie, setMovie] = useState(null);
   const [trailerUrl, setTrailerUrl] = useState("");
   const [loading, setLoading] = useState(true);
@@ -17,10 +17,11 @@ function MovieDetail({ movieId, onClose }) {
   const fetchMovieDetails = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/movie/${movieId}?api_key=9030e02c98db26eb8794fd00c7fa10a5`);
+      const response = await axios.get(`https://api.themoviedb.org/3/movie/${movieId}?api_key=9030e02c98db26eb8794fd00c7fa10a5&append_to_response=similar,credits`);
       setMovie(response.data);
     } catch (error) {
       console.error('Error fetching movie details:', error);
+      // Fallback or better error handling
     } finally {
       setLoading(false);
     }
@@ -32,141 +33,132 @@ function MovieDetail({ movieId, onClose }) {
     } else {
       movieTrailer(movie?.title || "")
         .then((url) => {
-          const urlParams = new URLSearchParams(new URL(url).search);
-          setTrailerUrl(urlParams.get("v"));
+          if (url) {
+            const urlParams = new URLSearchParams(new URL(url).search);
+            setTrailerUrl(urlParams.get("v"));
+          }
         })
         .catch((error) => console.log(error));
     }
   };
 
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-red-600 mx-auto mb-4"></div>
-          <p className="text-white">Loading movie details...</p>
-        </div>
-      </div>
-    );
-  }
-
+  if (loading) return null; // Or a smaller loading state if desired
   if (!movie) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/90 z-50 overflow-y-auto">
-      <div className="min-h-screen relative">
-        {/* Backdrop */}
-        <div className="absolute inset-0">
-          <img
-            src={`https://image.tmdb.org/t/p/w1280${movie.backdrop_path}`} // Changed from /original/ to /w1280/
-            alt={movie.title}
-            className="w-full h-full object-cover opacity-30"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent"></div>
-        </div>
-
-        {/* Close Button */}
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 text-white hover:text-gray-300 text-3xl"
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm overflow-y-auto"
+        onClick={onClose}
+      >
+        <motion.div
+          layoutId={`movie-${movieId}`}
+          className="relative bg-stream-dark w-full max-w-4xl rounded-xl shadow-2xl overflow-hidden m-4 outline-none"
+          onClick={e => e.stopPropagation()}
+          initial={{ scale: 0.9, opacity: 0, y: 50 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", damping: 25, stiffness: 300 }}
         >
-          ✕
-        </button>
+          {/* Close Button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 z-50 bg-black/50 text-white p-2 rounded-full hover:bg-white hover:text-black transition-colors"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
 
-        {/* Content */}
-        <div className="relative z-10 container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex flex-col lg:flex-row gap-8">
-              {/* Poster */}
-              <div className="flex-shrink-0">
-                <img
-                  src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`} // Changed from /w500/ to /w500/ (already optimized)
-                  alt={movie.title}
-                  className="w-64 h-96 object-cover rounded-lg shadow-2xl"
-                />
-              </div>
+          {/* Hero Section */}
+          <div className="relative h-[400px] w-full">
+            <div className="absolute inset-0">
+              <img
+                src={`https://image.tmdb.org/t/p/w1280${movie.backdrop_path}`}
+                alt={movie.title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-stream-dark via-transparent to-transparent"></div>
+            </div>
 
-              {/* Info */}
-              <div className="flex-1 text-white">
-                <h1 className="text-4xl font-bold mb-4">{movie.title}</h1>
-                
-                <div className="flex items-center gap-4 mb-4 text-sm text-gray-300">
-                  <span className="text-green-400 font-semibold">
-                    {movie.vote_average?.toFixed(1)} Rating
-                  </span>
-                  <span>{movie.release_date?.split('-')[0]}</span>
-                  <span>{movie.runtime} min</span>
-                  <span className="bg-red-600 px-2 py-1 rounded text-xs">
-                    {movie.adult ? 'TV-MA' : 'TV-14'}
-                  </span>
-                </div>
-
-                <div className="flex gap-2 mb-6">
-                  {movie.genres?.map(genre => (
-                    <span key={genre.id} className="bg-gray-700 px-3 py-1 rounded-full text-sm">
-                      {genre.name}
-                    </span>
-                  ))}
-                </div>
-
-                <p className="text-gray-300 leading-relaxed mb-6">
-                  {movie.overview}
-                </p>
-
-                <div className="flex gap-4">
-                  <button className="bg-white text-black font-bold py-3 px-8 rounded flex items-center gap-2 hover:bg-gray-200 transition-colors">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                    </svg>
-                    Play
-                  </button>
-                  <button 
-                    onClick={handleTrailer}
-                    className="bg-gray-600/70 text-white font-bold py-3 px-8 rounded flex items-center gap-2 hover:bg-gray-600/50 transition-colors"
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Trailer
-                  </button>
-                  <button className="bg-gray-600/70 text-white font-bold py-3 px-8 rounded flex items-center gap-2 hover:bg-gray-600/50 transition-colors">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                    </svg>
-                    My List
-                  </button>
-                </div>
+            <div className="absolute bottom-10 left-10 right-10 flex flex-col gap-4">
+              <h1 className="text-5xl font-black text-white drop-shadow-lg">{movie.title}</h1>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={onPlay}
+                  className="bg-white text-black font-bold py-2 px-8 rounded flex items-center gap-2 hover:bg-stream-purple hover:text-white transition-all shadow-lg"
+                >
+                  <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" /></svg>
+                  Play
+                </button>
+                <button className="bg-gray-600/60 text-white font-bold py-2 px-6 rounded flex items-center gap-2 hover:bg-gray-600/80 backdrop-blur-md">
+                  + My List
+                </button>
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Trailer Modal */}
-      {trailerUrl && (
-        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-4xl">
-            <button 
-              onClick={() => setTrailerUrl("")}
-              className="absolute -top-12 right-0 text-white hover:text-gray-300 text-2xl"
-            >
-              ✕
-            </button>
-            <YouTube 
-              videoId={trailerUrl} 
-              opts={{
-                height: '390',
-                width: '100%',
-                playerVars: {
-                  autoplay: 1,
-                },
-              }} 
-            />
+          {/* Content Grid */}
+          <div className="p-10 grid grid-cols-1 md:grid-cols-3 gap-10">
+            {/* Left: Info */}
+            <div className="md:col-span-2 text-gray-300 space-y-6">
+              <div className="flex items-center gap-4 text-sm font-semibold">
+                <span className="text-green-400 text-lg">{Math.round(movie.vote_average * 10)}% Match</span>
+                <span className="border border-gray-500 px-2 py-0.5 rounded text-gray-400">{movie.release_date?.split('-')[0]}</span>
+                <span className="border border-white/40 px-2 py-0.5 rounded hover:bg-white/10">{movie.adult ? '18+' : '13+'}</span>
+                <span>{movie.runtime} min</span>
+              </div>
+
+              <p className="text-lg leading-relaxed text-white">
+                {movie.overview}
+              </p>
+            </div>
+
+            {/* Right: Meta */}
+            <div className="md:col-span-1 space-y-4 text-sm text-gray-400">
+              <div>
+                <span className="text-gray-500 block mb-1">Genres:</span>
+                <span className="text-white hover:underline cursor-pointer">
+                  {movie.genres?.map(g => g.name).join(', ')}
+                </span>
+              </div>
+              <div>
+                <span className="text-gray-500 block mb-1">Spoken Languages:</span>
+                <span className="text-white">
+                  {movie.spoken_languages?.map(l => l.name).join(', ')}
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+
+          {/* Similar Movies (Mock/Fetched) */}
+          {movie.similar?.results?.length > 0 && (
+            <div className="p-10 pt-0">
+              <h3 className="text-xl font-bold text-white mb-6">More Like This</h3>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {movie.similar.results.slice(0, 6).map(sim => (
+                  <div key={sim.id} className="bg-white/5 rounded-lg overflow-hidden hover:bg-white/10 cursor-pointer transition-colors relative group">
+                    <div className="h-32 bg-gray-800 relative">
+                      <img src={`https://image.tmdb.org/t/p/w300${sim.backdrop_path || sim.poster_path}`} className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" />
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="bg-white/20 p-2 rounded-full border border-white/50">
+                          <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" /></svg>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <h4 className="text-gray-200 text-sm font-semibold truncate">{sim.title}</h4>
+                      <p className="text-gray-500 text-xs mt-1">{sim.release_date?.split('-')[0]}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
-export default MovieDetail; 
+export default MovieDetail;
