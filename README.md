@@ -57,4 +57,4 @@ graph TD
 StreamFlow moves away from generic "Red/Black" themes to a sophisticated **"Cyberpunk Purple"** and **"Deep Ocean Blue"** palette, creating a distinct product identity.
 
 ---
-*Engineered by [Your Name]*
+*Engineered by Berkay Özgün*
